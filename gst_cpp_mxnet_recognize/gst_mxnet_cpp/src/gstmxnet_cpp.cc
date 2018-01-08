@@ -46,6 +46,8 @@
 
 #include <opencv2/opencv.hpp>
 
+#include "gstmxnet_cpp_interop.h"
+
 const mx_float DEFAULT_MEAN = 117.0;
 
 // Read file to buffer
@@ -189,19 +191,30 @@ enum {
     MODEL_IMAGE_SIZE = MODEL_WIDTH * MODEL_HEIGHT * MODEL_CHANNELS,
 };
 
-//TODO: move into (context-like) struct
-static PredictorHandle pred_hnd = 0;
-static NDListHandle nd_hnd = 0;
-static const mx_float* nd_data = NULL;
-static std::vector<std::string> synset;
-static std::vector<mx_float> image_data = std::vector<mx_float>(MODEL_IMAGE_SIZE);
+struct gst_mxnet_model {
+	PredictorHandle pred_hnd;
+	NDListHandle nd_hnd;
+	const mx_float *nd_data;
+	std::vector<std::string> synset;
+	std::vector<mx_float> image_data;
+	std::vector<float> mxnet_out_data;
 
-static std::vector<float> mxnet_out_data(1000);
+	gst_mxnet_model() :
+		pred_hnd(NULL),
+		nd_hnd(NULL),
+		nd_data(NULL),
+		synset(std::vector<std::string>(0)),
+		image_data(std::vector<mx_float>(MODEL_IMAGE_SIZE)),
+		mxnet_out_data(std::vector<float>(1000))
+	{}
+};
+
+static gst_mxnet_model *g_MxNetModel;
 
 /*
  * TODO: accept parameters, return struct
  */
-int gst_mxnet_init_network(void)
+gst_mxnet_model *gst_mxnet_init_network(void)
 {
     // Models path for your model, you have to modify it
     std::string json_file = "/pygst/mxnet_models/Inception/Inception-BN-symbol.json";
@@ -211,6 +224,8 @@ int gst_mxnet_init_network(void)
 
     BufferFile json_data(json_file);
     BufferFile param_data(param_file);
+
+	gst_mxnet_model *model = new gst_mxnet_model();
 
     // Parameters
     int dev_type = 1;  // 1: cpu, 2: gpu
@@ -228,7 +243,7 @@ int gst_mxnet_init_network(void)
 
     if (json_data.GetLength() == 0 ||
         param_data.GetLength() == 0) {
-        return -1;
+        return NULL;
     }
 
     // Create Predictor
@@ -241,8 +256,8 @@ int gst_mxnet_init_network(void)
                  input_keys,
                  input_shape_indptr,
                  input_shape_data,
-                 &pred_hnd);
-    assert(pred_hnd);
+                 &model->pred_hnd);
+    assert(model->pred_hnd);
 
     // Read Mean Data
     BufferFile nd_buf(nd_file);
@@ -256,24 +271,33 @@ int gst_mxnet_init_network(void)
 
         MXNDListCreate((const char*)nd_buf.GetBuffer(),
                    nd_buf.GetLength(),
-                   &nd_hnd, &nd_len);
+                   &model->nd_hnd, &nd_len);
 
-        MXNDListGet(nd_hnd, nd_index, &nd_key, &nd_data, &nd_shape, &nd_ndim);
+        MXNDListGet(model->nd_hnd, nd_index, &nd_key, &model->nd_data, &nd_shape, &nd_ndim);
     }
 
 	// Synset path for your model, you have to modify it
-    synset = LoadSynset(synset_file);
-	return 0;
+    model->synset = LoadSynset(synset_file);
+	return model;
 }
 
-void gst_mxnet_model_free(void)
+extern "C" void gst_mxnet_model_free(gst_mxnet_model_t *model)
 {
-    // Release NDList
-    if (nd_hnd)
-      MXNDListFree(nd_hnd);
+	if (!model) {
+		return;
+	}
 
-    // Release Predictor
-    MXPredFree(pred_hnd);
+    // Release NDList
+    if (model->nd_hnd) {
+      MXNDListFree(model->nd_hnd);
+	  model->nd_hnd = NULL;
+	}
+
+	if (model->pred_hnd) {
+		// Release Predictor
+		MXPredFree(model->pred_hnd);
+		model->pred_hnd = NULL;
+	}
 }
 
 extern "C" int gst_mxnet_process_frame(
@@ -281,21 +305,25 @@ extern "C" int gst_mxnet_process_frame(
 		unsigned gst_width,
 		unsigned gst_height)
 {
-	static int init_done = 0;
-	if (!init_done) {
-		init_done = 1;
-		gst_mxnet_init_network();
+	if (!g_MxNetModel) {
+		g_MxNetModel = gst_mxnet_init_network();
+	}
+
+	gst_mxnet_model *model = g_MxNetModel;
+	if (!model) {
+		std::cerr << __func__ << ": failed to initialize MxNet" << std::endl;
+		return -1;
 	}
 
     // Read Image Data
-    GetImageFile(gst_data, gst_width, gst_height, image_data.data(),
-                 MODEL_CHANNELS, cv::Size(MODEL_WIDTH, MODEL_HEIGHT), nd_data);
+    GetImageFile(gst_data, gst_width, gst_height, model->image_data.data(),
+                 MODEL_CHANNELS, cv::Size(MODEL_WIDTH, MODEL_HEIGHT), model->nd_data);
 
     // Set Input Image
-    MXPredSetInput(pred_hnd, "data", image_data.data(), MODEL_IMAGE_SIZE);
+    MXPredSetInput(model->pred_hnd, "data", model->image_data.data(), MODEL_IMAGE_SIZE);
 
     // Do Predict Forward
-    MXPredForward(pred_hnd);
+    MXPredForward(model->pred_hnd);
 
     mx_uint output_index = 0;
 
@@ -303,23 +331,23 @@ extern "C" int gst_mxnet_process_frame(
     mx_uint shape_len;
 
     // Get Output Result
-    MXPredGetOutputShape(pred_hnd, output_index, &shape, &shape_len);
+    MXPredGetOutputShape(model->pred_hnd, output_index, &shape, &shape_len);
 
     size_t size = 1;
     for (mx_uint i = 0; i < shape_len; ++i) size *= shape[i];
 
-	if (size > mxnet_out_data.size()) {
+	if (size > model->mxnet_out_data.size()) {
 		std::cerr << "mxnet_out_data resizing to " << size << std::endl;
-		mxnet_out_data.resize(size);
+		model->mxnet_out_data.resize(size);
 	}
 
-    MXPredGetOutput(pred_hnd, output_index, &(mxnet_out_data[0]), size);
+    MXPredGetOutput(model->pred_hnd, output_index, &(model->mxnet_out_data[0]), size);
 
     // Print Output Data
-    PrintOutputResult(mxnet_out_data, synset);
+    PrintOutputResult(model->mxnet_out_data, model->synset);
 
 	if (0) {
-		gst_mxnet_model_free();
+		gst_mxnet_model_free(model);
 	}
 
     return 0;

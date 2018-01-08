@@ -60,6 +60,7 @@
 #include <gst/gstsample.h>
 
 #include "gstmxnet.h"
+#include "gstmxnet_cpp_interop.h"
 
 GST_DEBUG_CATEGORY_STATIC(gst_mxnet_debug);
 #define GST_CAT_DEFAULT gst_mxnet_debug
@@ -220,20 +221,7 @@ gst_mxnet_template_transform_ip(GstBaseTransform * base, GstBuffer * outbuf)
 	XCHECK(gst_structure_get_int(structure, "width", &width));
 	XCHECK(gst_structure_get_int(structure, "height", &height));
 
-#if 0
-	//for testing without MxNet
-	for (i = 0; i < info.size / 8; i++) {
-		((unsigned char*)info.data)[i] ^= 0xff;
-	}
-
-	static int frame = 0;
-	if (++frame == 10)
-#endif
-	{
-		extern int gst_mxnet_process_frame(void *data, unsigned width, unsigned height);
-		g_print("%s: calling into MxNet CPP plugin\n", __func__);
-		gst_mxnet_process_frame(info.data, width, height);
-	}
+	gst_mxnet_process_frame(info.data, width, height);
 
 	gst_buffer_unmap(outbuf, &info);
 
