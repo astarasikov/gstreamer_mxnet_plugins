@@ -1,0 +1,4 @@
+WHAT IT IS
+----------
+
+A plugin which interfaces with the MxNet library to perform image classification.

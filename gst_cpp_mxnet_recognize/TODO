@@ -1,0 +1,4 @@
+* [mostly] Move initialization to GStreamer plugin constructor
+* GStreamer plugin caps filter to only accept RGB/RGBA
+* Pass format from GStreamer to OpenCV cv::Mat constructor
+* Use GStreamer plugin parameters for model path/parameters

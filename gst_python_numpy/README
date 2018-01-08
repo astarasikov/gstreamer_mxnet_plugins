@@ -1,0 +1,27 @@
+Here is how I set up docker (on mac):
+	brew install docker docker-machine
+	docker-machine create --driver virtualbox dev
+	eval $(docker-machine env dev)
+
+To build and run the image, use the following:
+	docker build -t gstest .
+	docker run -it gstest
+
+To stop and remove modified containers it shall be possible to do:
+	docker stop $(docker ps -a -q)
+	docker rm $(docker ps -a -q)
+
+An example command to generate the test video signal, process it with
+our plugin and encode to the video file is the following:
+
+	gst-launch-1.0 videotestsrc ! video/x-raw,format=RGBA  ! simple_numpy ! videoconvert ! theoraenc ! oggmux ! filesink location=/tmp/foo.ogg
+
+You can grab the image from the container to the host. First, list all running
+containers with "docker ps". Then, use the container ID from the first column
+in the following command:
+	docker cp ID:/tmp/foo.ogg .
+
+The plugin will crash with SIGSEGV if image is not in a 4-byte format
+(because the buffer is interpreted as NumPy array of 32-bit words).
+I think this can be improved by limiting the supported image format
+in the plugin caps list.

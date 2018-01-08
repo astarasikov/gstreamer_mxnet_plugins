@@ -1,0 +1,29 @@
+Here is how I set up docker (on mac):
+	brew install docker docker-machine
+	docker-machine create --driver virtualbox dev
+	eval $(docker-machine env dev)
+
+To build and run the image, use the following:
+	docker build -t gstest .
+	docker run -it gstest
+
+To stop and remove modified containers it shall be possible to do:
+	docker stop $(docker ps -a -q)
+	docker rm $(docker ps -a -q)
+
+If you need to modify the plugin (in "detection3" folder), you need to
+re-package the archive (because Dockerfile COPY does not copy the
+directory structure)
+	./pack.sh
+
+Recognize one input JPEG image
+	gst-launch-1.0 multifilesrc location=/tmp/img2.jpg loop=true  ! jpegparse  !  avdec_mjpeg ! videoconvert ! video/x-raw,format=RGB ! mxnet ! fakesink
+
+Combine input images into a sequence and recognize each of them
+	gst-launch-1.0  multifilesrc  location=/tmp/img%d.jpg index=0 caps="image/jpeg,framerate=\(fraction\)1/1" loop=true  ! jpegparse  !  avdec_mjpeg ! videoconvert ! video/x-raw,format=RGB !  mxnet  ! fakesink  sync=true
+
+Expected Result:
+	Observe a sequence of messages in GStreamer output
+	Best Result: [ lynx, catamount] id = 287, accuracy = 0.31229183
+	Best Result: [ boathouse] id = 449, accuracy = 0.86502564
+	Best Result: [ beagle] id = 162, accuracy = 0.30743387
