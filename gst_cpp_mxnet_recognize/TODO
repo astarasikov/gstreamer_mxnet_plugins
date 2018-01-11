@@ -1,4 +1,3 @@
-* [mostly] Move initialization to GStreamer plugin constructor
-* GStreamer plugin caps filter to only accept RGB/RGBA
-* Pass format from GStreamer to OpenCV cv::Mat constructor
+* [mostly] Move initialization to GStreamer plugin constructor. Currently free/re-init is not used. Not necessary until model parameters need to be changed dynamically.
 * Use GStreamer plugin parameters for model path/parameters
+* Draw resulting class text/probability string over source video buffer using OpenCV

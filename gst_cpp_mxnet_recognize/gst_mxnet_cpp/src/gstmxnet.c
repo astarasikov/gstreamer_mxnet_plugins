@@ -58,6 +58,7 @@
 
 #include <gst/gst.h>
 #include <gst/gstsample.h>
+#include <gst/video/video-format.h>
 
 #include "gstmxnet.h"
 #include "gstmxnet_cpp_interop.h"
@@ -83,16 +84,16 @@ enum {
  */
 static GstStaticPadTemplate sink_factory =
 GST_STATIC_PAD_TEMPLATE("sink",
-                        GST_PAD_SINK,
-                        GST_PAD_ALWAYS,
-                        GST_STATIC_CAPS("ANY")
-                        );
+		GST_PAD_SINK,
+		GST_PAD_ALWAYS,
+		GST_STATIC_CAPS(GST_VIDEO_CAPS_MAKE("RGB"))
+		);
 
 static GstStaticPadTemplate src_factory = GST_STATIC_PAD_TEMPLATE("src",
-                                                                  GST_PAD_SRC,
-                                                                  GST_PAD_ALWAYS,
-                                                                  GST_STATIC_CAPS("ANY")
-                                                                  );
+		GST_PAD_SRC,
+		GST_PAD_ALWAYS,
+		GST_STATIC_CAPS(GST_VIDEO_CAPS_MAKE("RGB"))
+		);
 
 #define gst_mxnet_parent_class parent_class
 G_DEFINE_TYPE(Gstmxnet, gst_mxnet, GST_TYPE_BASE_TRANSFORM);
