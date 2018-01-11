@@ -93,14 +93,9 @@ class BufferFile {
     }
 };
 
-void GetImageFile(void *gst_data,
-				unsigned gst_width,
-				unsigned gst_height,
+void GetImageFile(cv::Mat &im_ori,
                   mx_float* image_data, const int channels,
                   const cv::Size resize_size, const mx_float* mean_data = nullptr) {
-    // Read all kinds of file into a BGR color 3 channels image
-    cv::Mat im_ori(gst_width, gst_height, CV_8UC3, gst_data);
-
     if (im_ori.empty()) {
         assert(false);
     }
@@ -163,7 +158,7 @@ std::vector<std::string> LoadSynset(std::string synset_file) {
     return output;
 }
 
-void PrintOutputResult(const std::vector<float>& data, const std::vector<std::string>& synset) {
+void PrintOutputResultAndDraw(const std::vector<float>& data, const std::vector<std::string>& synset, cv::Mat &im_ori) {
     if (data.size() != synset.size()) {
         std::cerr << "Result data and synset size does not match!" << std::endl;
     }
@@ -180,8 +175,23 @@ void PrintOutputResult(const std::vector<float>& data, const std::vector<std::st
         }
     }
 
-    printf("Best Result: [%s] id = %d, accuracy = %.8f\n",
-    synset[best_idx].c_str(), best_idx, best_accuracy);
+	char buf[256] = {};
+    snprintf(buf, sizeof(buf), "Best Result: [%s] id = %d, accuracy = %.8f",
+		synset[best_idx].c_str(), best_idx, best_accuracy);
+	puts(buf);
+
+	/* Use shorter string for OpenCV to fit onto screen when input resolution is small */
+	snprintf(buf, sizeof(buf), "[%s] acc=%.8f",
+		synset[best_idx].c_str(), best_idx, best_accuracy);
+
+	/* Now, draw over the OpenCV Matrix which wraps the GStreamer buffer */
+	cv::putText(im_ori,
+            buf,
+            cv::Point(5,10), // Coordinates
+            cv::FONT_HERSHEY_COMPLEX_SMALL, // Font
+            0.5, // Scale. 2.0 = 2x bigger
+            cv::Scalar(0,255,0), // Color
+            1); // Thickness
 }
 
 enum {
@@ -315,8 +325,10 @@ extern "C" int gst_mxnet_process_frame(
 		return -1;
 	}
 
+	cv::Mat im_ori(gst_width, gst_height, CV_8UC3, gst_data);
+
     // Read Image Data
-    GetImageFile(gst_data, gst_width, gst_height, model->image_data.data(),
+    GetImageFile(im_ori, model->image_data.data(),
                  MODEL_CHANNELS, cv::Size(MODEL_WIDTH, MODEL_HEIGHT), model->nd_data);
 
     // Set Input Image
@@ -344,7 +356,7 @@ extern "C" int gst_mxnet_process_frame(
     MXPredGetOutput(model->pred_hnd, output_index, &(model->mxnet_out_data[0]), size);
 
     // Print Output Data
-    PrintOutputResult(model->mxnet_out_data, model->synset);
+    PrintOutputResultAndDraw(model->mxnet_out_data, model->synset, im_ori);
 
 	if (0) {
 		gst_mxnet_model_free(model);

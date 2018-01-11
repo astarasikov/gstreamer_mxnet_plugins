@@ -1,3 +1,2 @@
 * [mostly] Move initialization to GStreamer plugin constructor. Currently free/re-init is not used. Not necessary until model parameters need to be changed dynamically.
 * Use GStreamer plugin parameters for model path/parameters
-* Draw resulting class text/probability string over source video buffer using OpenCV
