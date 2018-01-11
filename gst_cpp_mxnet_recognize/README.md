@@ -42,25 +42,26 @@ To stop and remove modified containers it shall be possible to do:
 
 Recognize one input JPEG image
 ```	
-	gst-launch-1.0 multifilesrc location=/tmp/img2.jpg loop=true  ! jpegparse  !  avdec_mjpeg ! videoconvert ! video/x-raw,format=RGB ! mxnet ! fakesink
+	gst-launch-1.0 multifilesrc location=/tmp/img2.jpg loop=true  ! jpegparse  !  avdec_mjpeg ! videoconvert ! video/x-raw,format=BGR ! mxnet ! fakesink
 ```
 
 Combine input images into a sequence and recognize each of them
 ```
-	gst-launch-1.0  multifilesrc  location=/tmp/img%d.jpg index=0 caps="image/jpeg,framerate=\(fraction\)1/1" loop=true  ! jpegparse  !  avdec_mjpeg ! videoconvert ! video/x-raw,format=RGB !  mxnet  ! fakesink  sync=true
+	gst-launch-1.0  multifilesrc  location=/tmp/img%d.jpg index=0 caps="image/jpeg,framerate=\(fraction\)1/1" loop=true  ! jpegparse  !  avdec_mjpeg ! videoconvert ! video/x-raw,format=BGR !  mxnet  ! fakesink  sync=true
 ```
 
 Use the following command to capture the recording to a file to verify that recognition result message is written over the video stream:
 ```
-	gst-launch-1.0  multifilesrc  location=/tmp/img%d.jpg index=0 caps="image/jpeg,framerate=\(fraction\)1/1" loop=true  ! jpegparse  !  avdec_mjpeg ! videoconvert ! video/x-raw,format=RGB !  mxnet  ! videoconvert ! theoraenc ! oggmux ! filesink location=/tmp/foo.ogg
+	gst-launch-1.0  multifilesrc  location=/tmp/img%d.jpg index=0 caps="image/jpeg,framerate=\(fraction\)1/1" loop=true  ! jpegparse  !  avdec_mjpeg ! videoconvert ! video/x-raw,format=BGR !  mxnet  ! videoconvert ! theoraenc ! oggmux ! filesink location=/tmp/foo.ogg
 ```
 
 # Expected Result
 Observe a sequence of messages in GStreamer output
 ```
-	Best Result: [ lynx, catamount] id = 287, accuracy = 0.31229183
-	Best Result: [ boathouse] id = 449, accuracy = 0.86502564
-	Best Result: [ beagle] id = 162, accuracy = 0.30743387
+	Best Result: [ Egyptian cat] id = 285, accuracy = 0.45677155
+	Best Result: [ boathouse] id = 449, accuracy = 0.86752290
+	Best Result: [ beagle] id = 162, accuracy = 0.33147627
+
 ```
 
 If you captured the output to a file, inspect it with a video player and ensure that each frame has the text in GREEN showing the recognized category and accuracy. See the screenshots below for an example.
